@@ -23,12 +23,12 @@
 (defmacro with-base-url
   "Add a base-url that will be added to the output of the resolve-uri function."
   [base-url & body]
-  `(binding [*base-url* ~base-url]
+  `(binding [crate.core/*base-url* ~base-url]
      ~@body))
 
 (defmacro with-group
   "Group together a set of related form fields for use with the Ring
   nested-params middleware."
   [group & body]
-  `(binding [*group* (conj *group* (as-str ~group))]
+  `(binding [crate.form-helpers/*group* (conj crate.form-helpers/*group* (crate.core/as-str ~group))]
      (list ~@body)))

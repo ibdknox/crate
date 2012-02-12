@@ -1,6 +1,7 @@
 (ns crate.page-helpers
   (:use [crate.core :only [resolve-uri as-str]])
-  (:use-macros [crate.macros :only [defelem]]))
+  (:use-macros [crate.macros :only [defelem]])
+  (:require [clojure.string :as str]))
 
 (defn include-js
   "Include a list of external javascript files."
