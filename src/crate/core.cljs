@@ -88,4 +88,47 @@
       res
       (first res))))
 
+(defn add-optional-attrs
+  "Add an optional attribute argument to a function that returns a vector tag."
+  [func]
+  (fn [& args]
+    (if (map? (first args))
+      (let [[tag & body] (apply func (rest args))]
+        (if (map? (first body))
+          (apply vector tag (merge (first body) (first args)) (rest body))
+          (apply vector tag (first args) body)))
+      (apply func args))))
 
+(defn as-str
+  ([] "")
+  ([x]
+    ; TODO: Maybe use something like (satisfies? INamed x) instead?
+    (if (or (symbol? x) (keyword? x))
+      (name x)
+      (str x)))
+  ([x & xs]
+    ((fn [s more]
+       (if more
+         (recur (str s (as-str (first more))) (next more))
+         s))
+     (as-str x) xs)))
+
+(def ^:dynamic *html-mode* :xml)
+
+(defn escape-html
+  "Change special characters into HTML character entities."
+  [text]
+  (.. (as-str text)
+    (replace "&"  "&amp;")
+    (replace "<"  "&lt;")
+    (replace ">"  "&gt;")
+    (replace "\"" "&quot;")))
+
+(def ^:dynamic *base-url* nil)
+
+(defn resolve-uri
+  "Prepends the base-url to the supplied URI."
+  [uri]
+  (if (re-matches #"^\w+:.*" uri)
+    uri
+    (str *base-url* uri)))
