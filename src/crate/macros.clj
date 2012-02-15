@@ -5,11 +5,9 @@
   `(let [group# (swap! crate.core/group-id inc)]
      (defn ^{:crateGroup group#} 
        ~name ~params
-       (.setAttribute 
-         (crate.core/html
-           ~@body)
-         "crateGroup" 
-         group#))
+       (let [elem# (crate.core/html ~@body)] 
+         (.setAttribute elem# "crateGroup" group#)
+         elem#))
      (set! (.-prototype._crateGroup ~name) group#)))
 
 (defmacro defelem
