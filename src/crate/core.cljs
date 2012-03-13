@@ -1,4 +1,4 @@
-(ns crate.core 
+(ns crate.core
   (:require [goog.dom :as gdom]
             [clojure.string :as string]))
 
@@ -6,16 +6,15 @@
             :svg "http://www.w3.org/2000/svg"})
 
 ;; ********************************************
-;; Element creation via Hiccup-like vectors 
+;; Element creation via Hiccup-like vectors
 ;; ********************************************
 
 (declare elem-factory)
-(def elem-id (atom 0))
 (def group-id (atom 0))
 
-(defn dom-attr 
+(defn dom-attr
   ([elem attrs]
-   (when elem 
+   (when elem
      (if-not (map? attrs)
        (. elem (getAttribute (name attrs)))
        (do
@@ -55,7 +54,7 @@
                            (if t
                              [(or ns-xmlns nsp) t]
                              [(:xhtml xmlns) nsp]))
-        tag-attrs        (into {} 
+        tag-attrs        (into {}
                                (filter #(not (nil? (second %)))
                                        {:id (or id nil)
                                         :class (if class (string/replace class #"\." " "))}))
@@ -78,7 +77,7 @@
 (defn elem-factory [tag-def]
   (let [[nsp tag attrs content] (normalize-element tag-def)
         elem (create-elem nsp tag)]
-    (dom-attr elem (merge attrs {:crateId (swap! elem-id inc)}))
+    (dom-attr elem attrs)
     (as-content elem content)
     elem))
 
