@@ -71,8 +71,11 @@
       (rest content))
     content)))
 
-(defn create-elem [nsp tag]
-  (. js/document (createElementNS nsp tag)))
+(def create-elem (if (.-createElementNS js/document)
+                   (fn [nsp tag]
+                     (.createElementNS js/document nsp tag))
+                   (fn [_ tag]
+                     (.createElement js/document tag))))
 
 (defn elem-factory [tag-def]
   (let [[nsp tag attrs content] (normalize-element tag-def)
