@@ -1,3 +1,3 @@
-(defproject crate "0.1.0-alpha3"
+(defproject crate "0.2.0-snapshot"
   :description "A ClojureScript implementation of Hiccup"
   :dependencies [[clojure "1.3.0"]])
