@@ -6,7 +6,7 @@ Crate is a ClojureScript implementation of the awesome [Hiccup](https://github.c
 
 ```clojure
 (ns myapp
- (:use-macros [defpartial])
+ (:use-macros [crate.def-macros :only [defpartial]])
  (:require [crate.core :as crate]))
 
 (crate/html [:p.woot {:id "blah"} "Hey!"])
