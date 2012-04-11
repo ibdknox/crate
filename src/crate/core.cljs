@@ -22,7 +22,7 @@
            (dom-attr elem k v))
          elem))))
   ([elem k v]
-   (. elem (setAttribute (name k) v))
+   (. elem (setAttribute (name k) (if (keyword? v) (name v) v)))
    elem))
 
 (defn as-content [parent content]
