@@ -21,5 +21,7 @@
   passed to the resulting function is a map, it merges it with the attribute
   map of the returned tag value."
   [name & fdecl]
-  `(let [func# (fn ~@fdecl)]
-    (def ~name (crate.compiler/add-optional-attrs func#))))
+  `(do
+    (declare ~name)
+    (let [func# (fn ~@fdecl)]
+      (def ~name (crate.compiler/add-optional-attrs func#)))))

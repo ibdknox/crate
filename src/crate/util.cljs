@@ -42,7 +42,7 @@
   [params]
   (str/join "&"
     (for [[k v] params]
-      (str (encode-component k) "=" (encode-component v)))))
+      (str (url-encode-component k) "=" (url-encode-component v)))))
 
 (defn url
   "Creates a URL string from a variable list of arguments and an optional
