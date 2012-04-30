@@ -10,6 +10,8 @@
 ;; ********************************************
 
 (declare elem-factory)
+(declare as-content)
+
 (def group-id (atom 0))
 
 (defn dom-attr
@@ -25,17 +27,35 @@
    (. elem (setAttribute (name k) v))
    elem))
 
+(defmulti -as-content
+  (fn [content parent]
+    (cond
+     (nil? content) nil
+     (map? content) :map
+     (vector? content) :vector
+     (seq? content) :seq
+     (.-nodeName content) :node
+     :else (type content))))
+
+(defmethod -as-content nil [_ _] nil)
+
+(defmethod -as-content :map [c _]
+  (throw "Maps cannot be used as content"))
+
+(defmethod -as-content js/String [c _]
+  (gdom/createTextNode c))
+
+(defmethod -as-content :vector [c _]
+  (elem-factory c))
+
+(defmethod -as-content :seq [c parent]
+  (as-content parent c))
+
+(defmethod -as-content :node [c _] c)
+
 (defn as-content [parent content]
-  (doseq[c content]
-    (let [child (cond
-                  (nil? c) nil
-                  (map? c) (throw "Maps cannot be used as content")
-                  (string? c) (gdom/createTextNode c)
-                  (vector? c) (elem-factory c)
-                  ;;TODO: there's a bug in clojurescript that prevents seqs from
-                  ;; being considered collections
-                  (seq? c) (as-content parent c)
-                  (.-nodeName c) c)]
+  (doseq [c content]
+    (let [child (-as-content c parent)]
       (when child
         (gdom/appendChild parent child)))))
 
