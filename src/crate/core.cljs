@@ -34,7 +34,7 @@
      (map? content) :map
      (vector? content) :vector
      (seq? content) :seq
-     (.-nodeName content) :node
+     (.-nodeName content) :dom
      :else (type content))))
 
 (defmethod -as-content nil [_ _] nil)
@@ -51,13 +51,12 @@
 (defmethod -as-content :seq [c parent]
   (as-content parent c))
 
-(defmethod -as-content :node [c _] c)
+(defmethod -as-content :dom [c _] c)
 
 (defn as-content [parent content]
   (doseq [c content]
-    (let [child (-as-content c parent)]
-      (when child
-        (gdom/appendChild parent child)))))
+    (when-let [child (-as-content c parent)]
+      (gdom/appendChild parent child))))
 
 ;; From Weavejester's Hiccup: https://github.com/weavejester/hiccup/blob/master/src/hiccup/core.clj#L57
 (def ^{:doc "Regular expression that parses a CSS-style id and class from a tag name." :private true}
