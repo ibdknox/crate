@@ -1,6 +1,8 @@
-(ns crate.form-helpers
-  (:use [crate.core :only [escape-html resolve-uri as-str]])
-  (:use-macros [crate.macros :only [defelem]]))
+(ns crate.form
+  (:use [crate.util :only [escape-html to-uri as-str]])
+  (:use-macros [crate.def-macros :only [defelem]])
+  ; Must require crate.compiler for defelem to work.
+  (:require [crate.compiler :as compiler]))
 
 (def ^:dynamic *group* [])
 
@@ -100,7 +102,7 @@
 (defelem form-to
   [[method action] & body]
   (let [method-str (.toUpperCase (name method))
-        action-uri (resolve-uri action)]
+        action-uri (to-uri action)]
     (-> (if (contains? #{:get :post} method)
           [:form {:method method-str, :action action-uri}]
           [:form {:method "POST", :action action-uri}
