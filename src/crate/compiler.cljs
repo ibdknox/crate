@@ -1,6 +1,8 @@
 (ns crate.compiler
   (:require [goog.dom :as gdom]
-            [clojure.string :as string]))
+            [goog.style :as gstyle]
+            [clojure.string :as string]
+            [crate.binding :as bind]))
 
 (def xmlns {:xhtml "http://www.w3.org/1999/xhtml"
             :svg "http://www.w3.org/2000/svg"})
@@ -9,8 +11,57 @@
 ;; Element creation via Hiccup-like vectors
 ;; ********************************************
 
-(declare elem-factory)
+(declare elem-factory dom-attr dom-style)
 (def group-id (atom 0))
+
+
+;; ********************************************
+;; Data binding
+;; ********************************************
+
+(def ^:dynamic bindings (atom []))
+
+(defn capture-binding [tag b]
+  (swap! bindings conj [tag b]))
+
+(defmulti dom-binding (fn [type _ _] type))
+(defmethod dom-binding :text [_ b elem]
+  (bind/on-change b (fn [v]
+                      (gdom/setTextContent elem v))))
+
+(defmethod dom-binding :attr [_ [k b] elem]
+  (bind/on-change b (fn [v]
+                      (dom-attr elem k v))))
+
+(defmethod dom-binding :style [_ [k b] elem]
+  (bind/on-change b (fn [v]
+                      (dom-style elem k v))))
+
+(defn handle-bindings [bs elem]
+  (doseq [[type b] bs]
+    (dom-binding type b elem)))
+
+;; ********************************************
+;; element handling
+;; ********************************************
+
+(defn dom-style
+  ([elem v]
+   (cond
+     (string? v) (. elem (setAttribute "style" v))
+     (map? v) (doseq [[k v] v]
+                (dom-style elem k v))
+     (bind/binding? v) (do
+                         (capture-binding :attr [:style v])
+                         (dom-style (bind/value v))))
+   elem)
+  ([elem k v]
+   (let [v (if (bind/binding? v)
+             (do
+               (capture-binding :style [k v])
+               (bind/value v))
+             v)]
+     (gstyle/setStyle elem (name k) v))))
 
 (defn dom-attr
   ([elem attrs]
@@ -22,7 +73,14 @@
            (dom-attr elem k v))
          elem))))
   ([elem k v]
-   (. elem (setAttribute (name k) v))
+   (if (= k :style)
+     (dom-style elem v)
+     (let [v (if (bind/binding? v)
+               (do
+                 (capture-binding :attr [k v])
+                 (bind/value v))
+               v)]
+       (. elem (setAttribute (name k) v))))
    elem))
 
 (defn as-content [parent content]
@@ -35,6 +93,7 @@
                   ;;TODO: there's a bug in clojurescript that prevents seqs from
                   ;; being considered collections
                   (seq? c) (as-content parent c)
+                  (bind/binding? c) (do (capture-binding :text c) (as-content parent [(bind/value c)]))
                   (.-nodeName c) c)]
       (when child
         (gdom/appendChild parent child)))))
@@ -78,11 +137,13 @@
                      (.createElement js/document tag))))
 
 (defn elem-factory [tag-def]
-  (let [[nsp tag attrs content] (normalize-element tag-def)
-        elem (create-elem nsp tag)]
-    (dom-attr elem attrs)
-    (as-content elem content)
-    elem))
+  (binding [bindings (atom [])]
+    (let [[nsp tag attrs content] (normalize-element tag-def)
+          elem (create-elem nsp tag)]
+      (dom-attr elem attrs)
+      (as-content elem content)
+      (handle-bindings @bindings elem)
+      elem)))
 
 (defn add-optional-attrs
   "Add an optional attribute argument to a function that returns a vector tag."
