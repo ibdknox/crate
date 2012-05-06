@@ -121,7 +121,6 @@
   (let [[path opts] (if opts
                       [path opts]
                       [nil path])
-        _ (.log js/console (str "Path " path " :: Opts " opts))
         keyfn (or (:keyfn opts) hash)
         bc (bound-collection. (notifier. nil) nil (or opts {}) {})]
     (add-watch atm (watch-id) (fn [_ _ _ v]
