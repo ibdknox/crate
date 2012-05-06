@@ -37,6 +37,22 @@
   (bind/on-change b (fn [v]
                       (dom-style elem k v))))
 
+(defn dom-add [bc parent elem v]
+  (if-let [adder (bind/opt bc :add)]
+    (adder parent elem v)
+    (gdom/appendChild parent elem)))
+
+(defn dom-remove [bc elem]
+  (if-let [remover (bind/opt bc :remove)]
+    (remover elem)
+    (gdom/removeNode elem)))
+
+(defmethod dom-binding :coll [_ bc parent]
+  (bind/on-change bc (fn [type elem v]
+                       (condp = type
+                         :add (dom-add bc parent elem v)
+                         :remove (dom-remove bc elem)))))
+
 (defn handle-bindings [bs elem]
   (doseq [[type b] bs]
     (dom-binding type b elem)))
@@ -93,6 +109,7 @@
                   ;;TODO: there's a bug in clojurescript that prevents seqs from
                   ;; being considered collections
                   (seq? c) (as-content parent c)
+                  (bind/binding-coll? c) (do (capture-binding :coll c) (as-content parent [(bind/value c)]))
                   (bind/binding? c) (do (capture-binding :text c) (as-content parent [(bind/value c)]))
                   (.-nodeName c) c)]
       (when child
