@@ -1,9 +1,82 @@
 (ns crate.binding
   (:require [clojure.set :as set]))
 
-(let [id (atom 0)]
-  (defn watch-id []
-    (keyword (str "binding" (swap! id inc)))))
+;;*********************************************************
+;; subatom
+;;*********************************************************
+
+(deftype SubAtom [atm path prevhash watches]
+  IEquiv
+  (-equiv [o other] (identical? o other))
+
+  IDeref
+  (-deref [_] (get-in @atm path))
+
+  IPrintable
+  (-pr-seq [a opts]
+    (concat  ["#<SubAtom: "] (-pr-seq (get-in @atm path) opts) ">"))
+
+  IWatchable
+  (-notify-watches [this oldval newval]
+    (doseq [[key f] watches]
+      (f key this oldval newval)))
+  (-add-watch [this key f]
+    (set! (.-watches this) (assoc watches key f)))
+  (-remove-watch [this key]
+    (set! (.-watches this) (dissoc watches key)))
+
+  IHash
+  (-hash [this] (goog.getUid this)))
+
+(defn subatom
+  ([atm path] 
+   (let [path (if (coll? path)
+                path
+                [path])
+         [atm path] (if (instance? SubAtom atm)
+                      [(.-atm atm) (concat (.-path atm) path)]                 
+                      [atm path])
+         k (gensym "subatom")
+         sa (SubAtom. atm path (hash (get-in @atm path)) nil)]
+     (add-watch atm k
+                (fn [_ _ ov nv]
+                  (let [latest (get-in nv path)
+                        latest-hash (hash latest)]
+                    (when-not (= (.-prevhash sa) latest-hash)
+                      (set! (.-prevhash sa) latest-hash)
+                      (-notify-watches sa (get-in ov path) latest)))))
+     sa)))
+
+(defn sub-reset!
+  "Sets the value of atom to newval without regard for the
+  current value. Returns newval."
+  [sa new-value]
+  (swap! (.-atm sa) assoc-in (.-path sa) new-value)
+  new-value)
+
+(defn sub-swap!
+  "Atomically swaps the value of atom to be:
+  (apply f current-value-of-atom args). Note that f may be called
+  multiple times, and thus should be free of side effects.  Returns
+  the value that was swapped in."
+  ([sa f]
+     (sub-reset! sa (f @sa)))
+  ([sa f x]
+     (sub-reset! sa (f @sa x)))
+  ([sa f x y]
+     (sub-reset! sa (f @sa x y)))
+  ([sa f x y z]
+     (sub-reset! sa (f @sa x y z)))
+  ([sa f x y z & more]
+     (sub-reset! sa (apply f @sa x y z more))))
+
+
+;;*********************************************************
+;;rest
+;;*********************************************************
+
+(defn notify [w o v]
+  (-notify-watches w o v))
 
 (defprotocol bindable-coll)
 
@@ -15,122 +88,82 @@
   bindable
   (-value [this] (value-func @atm))
   (-on-change [this func]
-    (add-watch atm (watch-id) #(func (-value this)))))
-
-(deftype notifier-binding [notif value-func]
-  bindable
-  (-value [this] nil)
-  (-on-change [this func]
-    (add-watch notif (watch-id) (fn [_ _ _ v] (func (value-func v))))))
+    (add-watch atm (gensym "atom-binding") #(func (-value this)))))
 
 (deftype notifier [watches]
-  bindable
-  (-value [this] nil)
-  (-on-change [this func]
-    (add-watch this (watch-id) (fn [_ _ _ v] (func v))))
-
-  ILookup
-  (-lookup [o k] (notifier. {}))
-  (-lookup [o k not-found] not-found)
-
-  IHash
-  (-hash [t] nil)
-
   IWatchable
   (-notify-watches [this oldval newval]
     (doseq [[key f] watches]
-      (f key this nil newval)))
+      (f key this oldval newval)))
   (-add-watch [this key f]
     (set! (.-watches this) (assoc watches key f)))
   (-remove-watch [this key]
     (set! (.-watches this) (dissoc watches key))))
 
-(deftype bound-collection [notif hash opts stuff]
+(deftype bound-collection [atm notif opts stuff]
   bindable-coll
   bindable
   (-value [this] (map :elem (vals (.-stuff this))))
   (-on-change [this func]
-    (add-watch notif (watch-id) (fn [_ _ _ [event el v]]
-                                  (func event el v)))))
+    (add-watch notif 
+               (gensym "bound-coll") 
+               (fn [_ _ _ [event el v]]
+                 (func event el v)))))
 
-(defn- bc-add [bc key {:keys [value hash]}]
-  (let [notif (notifier. nil)
-        elem ((opt bc :as) notif)]
-    (set! (.-stuff bc) (assoc (.-stuff bc) key {:hash hash
-                                                :elem elem
-                                                :notif notif}))
-    (notify notif value)
-    (notify (.-notif bc) [:add elem value])))
+(defn- bc-add [bc path key]
+  (let [sa (subatom (.-atm bc) path)
+        elem ((opt bc :as) sa)]
+    (set! (.-stuff bc) (assoc (.-stuff bc) key {:elem elem
+                                                :subatom sa}))
+    (notify (.-notif bc) nil [:add elem @sa])))
 
 (defn- bc-remove [bc key]
   (let [notif (.-notif bc)
         prev  ((.-stuff bc) key)]
     (set! (.-stuff bc) (dissoc (.-stuff bc) key))
-    (notify (.-notif bc) [:remove (:elem prev) nil])) )
-
-(defn- bc-change [bc key {:keys [hash value]}]
-  (let [prev ((.-stuff bc) key)]
-    (set! (.-stuff bc) (assoc (.-stuff bc) key (assoc prev :hash hash)))
-    (notify (:notif prev) value)))
+    (notify (.-notif bc) nil [:remove (:elem prev) nil])) )
 
 (defn opt [bc k]
   ((.-opts bc) k))
 
+(defn ->indexed [coll]
+  (cond
+    (map? coll) (seq coll)
+    (set? coll) (map (juxt identity identity) coll)
+    :else (map-indexed vector coll)))
+
 (defn ->keyed [coll keyfn]
-  (reduce
-    (fn [res v]
-      (assoc res (keyfn v) {:value v
-                            :hash (hash v)}))
-    {}
-    coll))
+  (into #{} (map keyfn (->indexed coll))))
+
+(defn ->path [bc & segs]
+  (concat (or (opt bc :path) []) segs))
 
 (defn- bc-compare [bc neue keyfn]
   (let [prev (.-stuff bc)
-        nkeyed (->keyed neue keyfn)
         pset (into #{} (keys prev))
-        nset (into #{} (keys nkeyed))
+        nset (->keyed neue (opt bc :keyfn))
         added (set/difference nset pset)
-        removed (set/difference pset nset)
-        changed? (set/intersection pset nset)]
+        removed (set/difference pset nset)]
     (doseq [a added]
-      (bc-add bc a (nkeyed a)))
+      (bc-add bc (->path bc a) a))
     (doseq [r removed]
-      (bc-remove bc r))
-    (doseq [c changed?]
-      (let [latest (nkeyed c)
-            old (prev c)]
-        (when-not (= (:hash latest) (:hash old))
-          (bc-change bc c latest))))
-    (set! (.-hash bc) (hash neue))))
-
-(defn notify [notif v]
-  (-notify-watches notif nil v))
-
-(defn from-path [atm path]
-  (let [v (cond
-            (satisfies? IDeref atm) @atm
-            :else atm)]
-    (if-not path
-      v
-      (path v))))
-
-(defn notifier? [n]
-  (instance? crate.binding.notifier n))
+      (bc-remove bc r))))
 
 (defn bound-coll [atm & [path opts]]
   (let [[path opts] (if opts
                       [path opts]
                       [nil path])
-        keyfn (or (:keyfn opts) hash)
-        bc (bound-collection. (notifier. nil) nil (or opts {}) {})]
-    (add-watch atm (watch-id) (fn [_ _ _ v]
-                                (let [neue (from-path v path)
-                                      neue-hash (hash neue)]
-                                  (when-not (= neue-hash (.-hash bc))
-                                    (set! (.-hash bc) neue-hash)
-                                    (bc-compare bc neue keyfn)))))
-    (when-not (notifier? atm)
-      (bc-compare bc (from-path atm path) keyfn))
+        atm (if-not path
+              atm
+              (subatom atm path))
+        opts (assoc opts :path path)
+        opts (if-not (:keyfn opts)
+               (assoc opts :keyfn first)
+               (assoc opts :keyfn (comp (:keyfn opts) second)))
+        bc (bound-collection. atm (notifier. nil) opts {})]
+    (add-watch atm (gensym "bound-coll") (fn [_ _ _ neue]
+                                           (bc-compare bc neue)))
+    (bc-compare bc @atm keyfn)
     bc))
 
 
@@ -148,22 +181,4 @@
 
 (defn bound [atm & [func]]
   (let [func (or func identity)]
-    (if-not (binding? atm)
-      (atom-binding. atm func {})
-      (notifier-binding. atm func))))
-
-(comment
-
-  stuff {:elem el
-         :hash h
-         :notif n}
-
-  (def x (atom [{:name "chris"}
-                {:name "john"}]))
-
-  (defpartial named [n]
-    [:li [:p (bound n :name)]])
-
-  [:ul (bound-collection x {:as named})]
-
-  )
+    (atom-binding. atm func {})))
