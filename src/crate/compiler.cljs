@@ -27,7 +27,8 @@
 (defmulti dom-binding (fn [type _ _] type))
 (defmethod dom-binding :text [_ b elem]
   (bind/on-change b (fn [v]
-                      (gdom/setTextContent elem v))))
+                      (gdom/removeChildren elem)
+                      (as-content elem [v]))))
 
 (defmethod dom-binding :attr [_ [k b] elem]
   (bind/on-change b (fn [v]
@@ -111,7 +112,9 @@
                   (seq? c) (as-content parent c)
                   (bind/binding-coll? c) (do (capture-binding :coll c) (as-content parent [(bind/value c)]))
                   (bind/binding? c) (do (capture-binding :text c) (as-content parent [(bind/value c)]))
-                  (.-nodeName c) c)]
+                  (.-nodeName c) c
+                  (.-get c) (.get c 0)
+                  :else (gdom/createTextNode (str c)))]
       (when child
         (gdom/appendChild parent child)))))
 
