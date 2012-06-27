@@ -110,6 +110,9 @@
                (fn [_ _ _ [event el v]]
                  (func event el v)))))
 
+(defn opt [bc k]
+  ((.-opts bc) k))
+
 (defn- bc-add [bc path key]
   (let [sa (subatom (.-atm bc) path)
         elem ((opt bc :as) sa)]
@@ -122,9 +125,6 @@
         prev  ((.-stuff bc) key)]
     (set! (.-stuff bc) (dissoc (.-stuff bc) key))
     (notify (.-notif bc) nil [:remove (:elem prev) nil])) )
-
-(defn opt [bc k]
-  ((.-opts bc) k))
 
 (defn ->indexed [coll]
   (cond
