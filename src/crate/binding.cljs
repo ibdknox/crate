@@ -181,4 +181,4 @@
 
 (defn bound [atm & [func]]
   (let [func (or func identity)]
-    (atom-binding. atm func {})))
+    (atom-binding. atm func)))
