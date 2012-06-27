@@ -88,7 +88,7 @@
                 (dom-style elem k v))
      (bind/binding? v) (do
                          (capture-binding :attr [:style v])
-                         (dom-style (bind/value v))))
+                         (dom-style elem (bind/value v))))
    elem)
   ([elem k v]
    (let [v (if (bind/binding? v)
