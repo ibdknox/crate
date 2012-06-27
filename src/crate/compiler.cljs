@@ -7,24 +7,6 @@
 (def xmlns {:xhtml "http://www.w3.org/1999/xhtml"
             :svg "http://www.w3.org/2000/svg"})
 
-(defn as-content [parent content]
-  (doseq[c content]
-    (let [child (cond
-                  (nil? c) nil
-                  (map? c) (throw "Maps cannot be used as content")
-                  (string? c) (gdom/createTextNode c)
-                  (vector? c) (elem-factory c)
-                  ;;TODO: there's a bug in clojurescript that prevents seqs from
-                  ;; being considered collections
-                  (seq? c) (as-content parent c)
-                  (bind/binding-coll? c) (do (capture-binding :coll c) (as-content parent [(bind/value c)]))
-                  (bind/binding? c) (do (capture-binding :text c) (as-content parent [(bind/value c)]))
-                  (.-nodeName c) c
-                  (.-get c) (.get c 0)
-                  :else (gdom/createTextNode (str c)))]
-      (when child
-        (gdom/appendChild parent child)))))
-
 ;; ********************************************
 ;; Element creation via Hiccup-like vectors
 ;; ********************************************
@@ -75,6 +57,28 @@
 (defn handle-bindings [bs elem]
   (doseq [[type b] bs]
     (dom-binding type b elem)))
+
+;; ********************************************
+;; content conversion
+;; ********************************************
+
+(defn as-content [parent content]
+  (doseq[c content]
+    (let [child (cond
+                  (nil? c) nil
+                  (map? c) (throw "Maps cannot be used as content")
+                  (string? c) (gdom/createTextNode c)
+                  (vector? c) (elem-factory c)
+                  ;;TODO: there's a bug in clojurescript that prevents seqs from
+                  ;; being considered collections
+                  (seq? c) (as-content parent c)
+                  (bind/binding-coll? c) (do (capture-binding :coll c) (as-content parent [(bind/value c)]))
+                  (bind/binding? c) (do (capture-binding :text c) (as-content parent [(bind/value c)]))
+                  (.-nodeName c) c
+                  (.-get c) (.get c 0)
+                  :else (gdom/createTextNode (str c)))]
+      (when child
+        (gdom/appendChild parent child)))))
 
 ;; ********************************************
 ;; element handling
