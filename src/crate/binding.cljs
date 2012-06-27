@@ -138,7 +138,7 @@
 (defn ->path [bc & segs]
   (concat (or (opt bc :path) []) segs))
 
-(defn- bc-compare [bc neue keyfn]
+(defn- bc-compare [bc neue]
   (let [prev (.-stuff bc)
         pset (into #{} (keys prev))
         nset (->keyed neue (opt bc :keyfn))
@@ -163,7 +163,7 @@
         bc (bound-collection. atm (notifier. nil) opts {})]
     (add-watch atm (gensym "bound-coll") (fn [_ _ _ neue]
                                            (bc-compare bc neue)))
-    (bc-compare bc @atm keyfn)
+    (bc-compare bc @atm)
     bc))
 
 
