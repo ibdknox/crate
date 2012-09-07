@@ -122,6 +122,11 @@
 (def ^{:doc "Regular expression that parses a CSS-style id and class from a tag name." :private true}
   re-tag #"([^\s\.#]+)(?:#([^\s\.#]+))?(?:\.([^\s#]+))?")
 
+(defn- normalize-map-attrs [map-attrs]
+  (into {} (map (fn [[n v]] (if (true? v) [n (name n)] [n v]))
+                (filter (comp boolean second)
+                        map-attrs))))
+
 (defn- normalize-element
   "Ensure a tag vector is of the form [tag-name attrs content]."
   [[tag & content]]
@@ -139,7 +144,7 @@
                                         :class (if class (string/replace class #"\." " "))}))
         map-attrs        (first content)]
     (if (map? map-attrs)
-      [nsp tag (merge tag-attrs map-attrs) (next content)]
+      [nsp tag (merge tag-attrs (normalize-map-attrs map-attrs)) (next content)]
       [nsp tag tag-attrs content])))
 
 (defn parse-content [elem content]
