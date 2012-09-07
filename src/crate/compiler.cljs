@@ -36,7 +36,9 @@
 
 (defmethod dom-binding :style [_ [k b] elem]
   (bind/on-change b (fn [v]
-                      (dom-style elem k v))))
+                      (if k
+                        (dom-style elem k v)
+                        (dom-style elem v)))))
 
 (defn dom-add [bc parent elem v]
   (if-let [adder (bind/opt bc :add)]
@@ -69,8 +71,8 @@
      (map? v) (doseq [[k v] v]
                 (dom-style elem k v))
      (bind/binding? v) (do
-                         (capture-binding :attr [:style v])
-                         (dom-style (bind/value v))))
+                         (capture-binding :style [nil v])
+                         (dom-style elem (bind/value v))))
    elem)
   ([elem k v]
    (let [v (if (bind/binding? v)

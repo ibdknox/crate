@@ -1,5 +1,4 @@
-(ns crate.binding
-  (:require [clojure.set :as set]))
+(ns crate.binding (:require [clojure.set :as set]))
 
 ;;*********************************************************
 ;; subatom
@@ -21,7 +20,8 @@
     (doseq [[key f] watches]
       (f key this oldval newval)))
   (-add-watch [this key f]
-    (set! (.-watches this) (assoc watches key f)))
+    (when f
+      (set! (.-watches this) (assoc watches key f))))
   (-remove-watch [this key]
     (set! (.-watches this) (dissoc watches key)))
 
@@ -29,12 +29,12 @@
   (-hash [this] (goog.getUid this)))
 
 (defn subatom
-  ([atm path] 
+  ([atm path]
    (let [path (if (coll? path)
                 path
                 [path])
          [atm path] (if (instance? SubAtom atm)
-                      [(.-atm atm) (concat (.-path atm) path)]                 
+                      [(.-atm atm) (concat (.-path atm) path)]
                       [atm path])
          k (gensym "subatom")
          sa (SubAtom. atm path (hash (get-in @atm path)) nil)]
@@ -105,8 +105,8 @@
   bindable
   (-value [this] (map :elem (vals (.-stuff this))))
   (-on-change [this func]
-    (add-watch notif 
-               (gensym "bound-coll") 
+    (add-watch notif
+               (gensym "bound-coll")
                (fn [_ _ _ [event el v]]
                  (func event el v)))))
 
@@ -142,10 +142,10 @@
   (let [prev (.-stuff bc)
         pset (into #{} (keys prev))
         nset (->keyed neue (opt bc :keyfn))
-        added (set/difference nset pset)
-        removed (set/difference pset nset)]
+        added (into (sorted-set) (set/difference nset pset))
+        removed (into (sorted-set) (set/difference pset nset))]
     (doseq [a added]
-      (bc-add bc (->path bc a) a))
+      (bc-add bc a a))
     (doseq [r removed]
       (bc-remove bc r))))
 
@@ -160,12 +160,25 @@
         opts (if-not (:keyfn opts)
                (assoc opts :keyfn first)
                (assoc opts :keyfn (comp (:keyfn opts) second)))
-        bc (bound-collection. atm (notifier. nil) opts {})]
+        bc (bound-collection. atm (notifier. nil) opts (sorted-map))]
     (add-watch atm (gensym "bound-coll") (fn [_ _ _ neue]
                                            (bc-compare bc neue)))
-    (bc-compare bc @atm keyfn)
+    (bc-compare bc @atm (:keyfn opts))
     bc))
 
+(defn map-bound [as atm & [opts]]
+  (let [opts (assoc opts :as as)
+        atm (if-not (:path opts)
+              atm
+              (subatom atm (:path opts)))
+        opts (if-not (:keyfn opts)
+               (assoc opts :keyfn first)
+               (assoc opts :keyfn (comp (:keyfn opts) second)))
+        bc (bound-collection. atm (notifier. nil) opts (sorted-map))]
+    (add-watch atm (gensym "bound-coll") (fn [_ _ _ neue]
+                                           (bc-compare bc neue)))
+    (bc-compare bc @atm (:keyfn opts))
+    bc))
 
 (defn binding? [b]
   (satisfies? bindable b))
@@ -175,6 +188,9 @@
 
 (defn value [b]
   (-value b))
+
+(defn index [sub-atom]
+  (last (.-path sub-atom)))
 
 (defn on-change [b func]
   (-on-change b func))
