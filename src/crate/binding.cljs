@@ -110,6 +110,9 @@
                (fn [_ _ _ [event el v]]
                  (func event el v)))))
 
+(defn opt [bc k]
+  ((.-opts bc) k))
+
 (defn- bc-add [bc path key]
   (let [sa (subatom (.-atm bc) path)
         elem ((opt bc :as) sa)]
@@ -123,9 +126,6 @@
     (set! (.-stuff bc) (dissoc (.-stuff bc) key))
     (notify (.-notif bc) nil [:remove (:elem prev) nil])) )
 
-(defn opt [bc k]
-  ((.-opts bc) k))
-
 (defn ->indexed [coll]
   (cond
     (map? coll) (seq coll)
@@ -138,7 +138,7 @@
 (defn ->path [bc & segs]
   (concat (or (opt bc :path) []) segs))
 
-(defn- bc-compare [bc neue keyfn]
+(defn- bc-compare [bc neue]
   (let [prev (.-stuff bc)
         pset (into #{} (keys prev))
         nset (->keyed neue (opt bc :keyfn))
@@ -163,7 +163,7 @@
         bc (bound-collection. atm (notifier. nil) opts {})]
     (add-watch atm (gensym "bound-coll") (fn [_ _ _ neue]
                                            (bc-compare bc neue)))
-    (bc-compare bc @atm keyfn)
+    (bc-compare bc @atm)
     bc))
 
 
@@ -181,4 +181,4 @@
 
 (defn bound [atm & [func]]
   (let [func (or func identity)]
-    (atom-binding. atm func {})))
+    (atom-binding. atm func)))
