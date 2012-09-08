@@ -41,8 +41,12 @@
      (add-watch atm k
                 (fn [_ _ ov nv]
                   (let [latest (get-in nv path)
+                        prev (get-in ov path)
                         latest-hash (hash latest)]
-                    (when-not (= (.-prevhash sa) latest-hash)
+                    (when (and (not= (.-prevhash sa) latest-hash)
+                               ;;TODO: How is it possible that the hashes are different
+                               ;;when the items are the same? This seems like a CLJS bug.
+                               (not= prev latest))
                       (set! (.-prevhash sa) latest-hash)
                       (-notify-watches sa (get-in ov path) latest)))))
      sa)))
