@@ -4,7 +4,8 @@
 ;; subatom
 ;;*********************************************************
 
-(deftype SubAtom [atm path prevhash watches]
+(deftype SubAtom [atm path prevhash watches key]
+
   IEquiv
   (-equiv [o other] (identical? o other))
 
@@ -37,7 +38,7 @@
                       [(.-atm atm) (concat (.-path atm) path)]
                       [atm path])
          k (gensym "subatom")
-         sa (SubAtom. atm path (hash (get-in @atm path)) nil)]
+         sa (SubAtom. atm path (hash (get-in @atm path)) nil k)]
      (add-watch atm k
                 (fn [_ _ ov nv]
                   (let [latest (get-in nv path)
@@ -74,6 +75,10 @@
   ([sa f x y z & more]
      (sub-reset! sa (apply f @sa x y z more))))
 
+(defn sub-destroy! [sa]
+  (remove-watch (.-atm sa) (.-key sa))
+  (set! (.-watches sa) nil)
+  (set! (.-atm sa) nil))
 
 ;;*********************************************************
 ;;rest
@@ -128,7 +133,8 @@
   (let [notif (.-notif bc)
         prev  ((.-stuff bc) key)]
     (set! (.-stuff bc) (dissoc (.-stuff bc) key))
-    (notify (.-notif bc) nil [:remove (:elem prev) nil])) )
+    (notify (.-notif bc) nil [:remove (:elem prev) nil])
+    (sub-destroy! (:subatom prev))))
 
 (defn ->indexed [coll]
   (cond
@@ -189,6 +195,9 @@
 
 (defn binding-coll? [b]
   (satisfies? bindable-coll b))
+
+(defn deref? [atm]
+  (satisfies? IDeref atm))
 
 (defn value [b]
   (-value b))
