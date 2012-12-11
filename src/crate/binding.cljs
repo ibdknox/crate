@@ -12,9 +12,9 @@
   IDeref
   (-deref [_] (get-in @atm path))
 
-  IPrintable
-  (-pr-seq [a opts]
-    (concat  ["#<SubAtom: "] (-pr-seq (get-in @atm path) opts) ">"))
+  IPrintWithWriter
+  (-pr-writer [this writer opts]
+    (-write writer (str "#<SubAtom: " (pr-str (get-in @atm path)) ">")))
 
   IWatchable
   (-notify-watches [this oldval newval]
