@@ -21,6 +21,16 @@ Crate is a ClojureScript implementation of the awesome [Hiccup](https://github.c
 
 ```
 
+## Differences from Hiccup
+
+* The crate.core/html returns dom nodes instead of strings of html
+* You can use dom nodes in element bodies like this:
+
+```clojure
+(crate/html [:div (.htmlToDocumentFragment goog.dom "<span>foo</span><strong>bar</strong>")])
+=> <div><span>foo</span><strong>bar</strong></div>
+```
+
 ## License
 
 Copyright (C) 2011 Chris Granger
