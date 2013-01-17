@@ -1,4 +1,4 @@
-(ns crate.binding (:require [clojure.set :as set]))
+(ns crate.binding (:require [clojure.set :as set])) 
 
 ;;*********************************************************
 ;; subatom
@@ -79,6 +79,66 @@
   (remove-watch (.-atm sa) (.-key sa))
   (set! (.-watches sa) nil)
   (set! (.-atm sa) nil))
+
+;;*********************************************************
+;; computed
+;;*********************************************************
+
+(defprotocol computable
+  (-compute [this] "compute the latest value")) 
+
+(deftype Computed [atms value func watches key]
+
+  IEquiv
+  (-equiv [o other] (identical? o other))
+
+  IDeref
+  (-deref [_] value)
+
+  IPrintWithWriter
+  (-pr-writer [this writer opts]
+    (-write writer (str "#<Computed: " (pr-str value) ">")))
+
+  IWatchable
+  (-notify-watches [this oldval newval]
+    (doseq [[key f] watches]
+      (f key this oldval newval)))
+  (-add-watch [this key f]
+    (when f
+      (set! (.-watches this) (assoc watches key f))))
+  (-remove-watch [this key]
+    (set! (.-watches this) (dissoc watches key)))
+
+  IHash
+  (-hash [this] (goog.getUid this))
+  
+  computable
+  (-compute [this] 
+            (let [old (.-value this)]
+              (set! (.-value this) (apply func (map deref atms)))
+              (-notify-watches this old (.-value this))
+            )))
+
+(defn computed [atms func]
+   (let [k (gensym "computed")
+         neue (Computed. atms nil func nil k)]
+     (-compute neue)
+     (doseq [atm atms]
+       (add-watch atm k (fn [_ _ _ _]
+                          (-compute neue))))
+     neue)) 
+
+(def z (atom [])) 
+
+(def y (computed [z] (fn [z]
+                       (filter even? z)))) 
+
+(def r (computed [y] (fn [y]
+                       (filter #(> % 100) y)))) 
+
+(swap! z conj 1340) 
+@y 
+@r 
 
 ;;*********************************************************
 ;;rest
