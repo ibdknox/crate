@@ -24,9 +24,13 @@
 (defn capture-binding [tag b]
   (swap! bindings conj [tag b]))
 
+(defprotocol Element
+  (-elem [this]))
+
 (defn as-content [parent content]
   (doseq[c content]
     (let [child (cond
+                 	(satisfies? Element c) (-elem c)
                   (nil? c) nil
                   (map? c) (throw "Maps cannot be used as content")
                   (string? c) (gdom/createTextNode c)

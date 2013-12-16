@@ -1,4 +1,4 @@
-(ns crate.binding (:require [clojure.set :as set])) 
+(ns crate.binding (:require [clojure.set :as set]))
 
 ;;*********************************************************
 ;; subatom
@@ -10,7 +10,7 @@
   (-equiv [o other] (identical? o other))
 
   IDeref
-  (-deref [_] (get-in @atm path))
+  (-deref [_] (when atm (get-in @atm path)))
 
   IPrintWithWriter
   (-pr-writer [this writer opts]
@@ -85,9 +85,10 @@
 ;;*********************************************************
 
 (defprotocol computable
-  (-compute [this] "compute the latest value")) 
+  (-depend [this atm] "depend on an atom")
+  (-compute [this] "compute the latest value"))
 
-(deftype Computed [atms value func watches key]
+(deftype Computed [atms value func watches key meta]
 
   IEquiv
   (-equiv [o other] (identical? o other))
@@ -111,34 +112,35 @@
 
   IHash
   (-hash [this] (goog.getUid this))
-  
+
+  IMeta
+  (-meta [this] meta)
+
   computable
-  (-compute [this] 
-            (let [old (.-value this)]
-              (set! (.-value this) (apply func (map deref atms)))
-              (-notify-watches this old (.-value this))
+  (-depend [this atm]
+           (set! (.-atms this) (conj (.-atms this) atm))
+           (add-watch atm key (fn [_ _ _ _]
+                                (-compute this))))
+  (-compute [this]
+            (let [old (.-value this)
+                  nv (apply func (map deref atms))]
+              (set! (.-value this) nv)
+              (-notify-watches this old nv)
             )))
 
 (defn computed [atms func]
    (let [k (gensym "computed")
-         neue (Computed. atms nil func nil k)]
+         neue (Computed. [] nil func nil k nil)]
      (-compute neue)
      (doseq [atm atms]
-       (add-watch atm k (fn [_ _ _ _]
-                          (-compute neue))))
-     neue)) 
+       (-depend neue atm))
+     neue))
 
-(def z (atom [])) 
+(defn compute [compu]
+  (-compute compu))
 
-(def y (computed [z] (fn [z]
-                       (filter even? z)))) 
-
-(def r (computed [y] (fn [y]
-                       (filter #(> % 100) y)))) 
-
-(swap! z conj 1340) 
-@y 
-@r 
+(defn depend-on [compu atm]
+  (-depend compu atm))
 
 ;;*********************************************************
 ;;rest
