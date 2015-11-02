@@ -4,3 +4,4 @@ pom.xml
 /classes/
 .lein-deps-sum
 /.idea/*
+*.iml
