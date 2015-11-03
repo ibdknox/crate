@@ -120,8 +120,11 @@
                (do
                  (capture-binding :attr [k v])
                  (bind/value v))
-               v)]
-       (. elem (setAttribute (name k) v))))
+               v)
+           event (second (re-find #"^on(\w+)" (name k)))]
+       (if event
+         (. elem (addEventListener event v))
+         (. elem (setAttribute (name k) v)))))
    elem))
 
 ;; From Weavejester's Hiccup: https://github.com/weavejester/hiccup/blob/master/src/hiccup/core.clj#L57
@@ -170,7 +173,8 @@
 (defn elem-factory [tag-def]
   (binding [bindings (atom [])]
     (let [[nsp tag attrs content] (normalize-element tag-def)
-          elem (create-elem nsp tag)]
+          elem (create-elem nsp tag)
+          onclick (:onclick attrs)]
       (dom-attr elem attrs)
       (as-content elem content)
       (handle-bindings @bindings elem)
