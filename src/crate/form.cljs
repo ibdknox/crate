@@ -66,10 +66,12 @@
   ([coll] (select-options coll nil))
   ([coll selected]
     (for [x coll]
-      (if (sequential? x)
-        (let [[text val] x]
-          [:option {:value val :selected (= val selected)} text])
-        [:option {:selected (= x selected)} x]))))
+      (let [[text val] (if (sequential? x) x [x x])
+            attr {:value val}
+            attr (if (= val selected)
+                   (assoc attr :selected "selected")
+                   attr)]
+        [:option attr text]))))
 
 (defelem drop-down
   ([name options] (drop-down name options nil))
